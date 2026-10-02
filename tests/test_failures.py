@@ -32,10 +32,17 @@ class FailureTest(unittest.TestCase):
 
     def test_duplicate_and_valve_conflict(self):
         item = self.service.create_item(self.payload, "d", "dispatcher")
-        with self.assertRaises(ConflictError):
-            self.service.create_item(self.payload, "d", "dispatcher")
+        # 同一管段在途：第二起报警并入同一事件，来源并存
+        merged = self.service.create_item(dict(self.payload, reporter="patrol-1"), "d", "dispatcher")
+        self.assertEqual(merged["id"], item["id"])
+        self.assertTrue(merged["merged"])
+        self.assertGreaterEqual(len(merged["sources"]), 2)
+        # 完全相同的报告重复提交：幂等，不再并入来源
+        deduped = self.service.create_item(self.payload, "d", "dispatcher")
+        self.assertTrue(deduped["deduped"])
+        self.assertEqual(len(deduped["sources"]), len(merged["sources"]))
         item["payload"]["valve_status_conflict"] = False
-        item = self.service.act(item["id"], "verify", {"field_confirmed": True}, "r", "responder", item["version"])
+        item = self.service.act(item["id"], "verify", {"field_confirmed": True}, "r", "responder", merged["version"])
         with self.assertRaises(DomainError) as context:
             self.service.act(item["id"], "isolate", {"valve_sequence": ["V-1"]}, "s", "supervisor", item["version"])
         self.assertEqual(context.exception.code, "valve_sequence_required")

@@ -1,5 +1,8 @@
-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>燃气管线泄漏响应</title><body><h1>燃气管线泄漏检测与隔离协调</h1><p>使用 JSON API 创建泄漏事件、登记巡检或传感记录，并完成核验、隔离、抢修、试压与恢复。</p><pre>GET /health
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>燃气管线泄漏响应</title><body><h1>燃气管线泄漏检测与隔离协调</h1><p>使用 JSON API 创建泄漏事件、登记巡检或传感记录，并完成核验、隔离、阀门回执、抢修、试压、危险解除、对账与恢复。</p><p>同一管段的在途报警会合并为一个事件（来源并存）；隔离按阀门回执建立断点，失败后从断点续作，重复回执不重复执行；对账按阀门回执、试压和危险解除记录核对，未通过则留在待处理；状态、版本与审计链在服务重启后保持一致。</p><pre>GET /health
 GET /api/state
+GET /api/items
 POST /api/items
 POST /api/items/{id}/sources
-POST /api/items/{id}/actions</pre></body></html>
+POST /api/items/{id}/actions
+  verify | isolate | valve_receipt | repair | pressure_test | hazard_clear | reconcile | restore | cancel
+GET /api/items/{id}/audit</pre></body></html>

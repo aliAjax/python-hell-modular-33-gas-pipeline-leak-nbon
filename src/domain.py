@@ -2,10 +2,13 @@ from datetime import datetime
 
 
 class DomainError(Exception):
-    def __init__(self, code, message, status=400):
+    def __init__(self, code, message, status=400, mismatches=None):
         super().__init__(message)
         self.code = code
         self.status = status
+        self.mismatches = mismatches or []
+        # 部分成功的结果：需要落库后再抛出（如对账失败仍保留对账记录）
+        self.partial = None
 
 
 class ConflictError(DomainError):
@@ -57,6 +60,11 @@ def normalize_create(payload):
     if odor_reports < 0:
         raise DomainError("invalid_odor_reports", "异味报告数不能为负数")
     reporter = require_text(payload, "reporter")
+    source_type = payload.get("source_type") or "alarm"
+    external_id = payload.get("external_id") or reporter
+    # 管段键：同一管线同一管段的在途报警必须合并为一个事件
+    segment_key = "%s|%s" % (pipeline_id, segment_id)
+    # 稳定键：精确到一次报告，用于重复提交的幂等判断
     stable_key = "%s|%s|%s" % (pipeline_id, segment_id, reported_at)
     return {
         "pipeline_id": pipeline_id,
@@ -66,9 +74,12 @@ def normalize_create(payload):
         "sensor_value_ppm": sensor_ppm,
         "odor_reports": odor_reports,
         "reporter": reporter,
+        "source_type": source_type,
+        "external_id": external_id,
         "source_comparison": [],
         "valve_sequence": [],
         "hazards_clear": False,
+        "_segment_key": segment_key,
         "_stable_key": stable_key,
     }
 

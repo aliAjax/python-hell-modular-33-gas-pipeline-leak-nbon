@@ -41,7 +41,14 @@ def build_handler(service, static_dir):
         def _error(self, exc):
             status = getattr(exc, "status", 500)
             code = getattr(exc, "code", "internal_error")
-            self._send(status, {"error": code, "message": str(exc)})
+            body = {"error": code, "message": str(exc)}
+            mismatches = getattr(exc, "mismatches", None)
+            if mismatches:
+                body["mismatches"] = mismatches
+            current_version = getattr(exc, "current_version", None)
+            if current_version is not None:
+                body["current_version"] = current_version
+            self._send(status, body)
 
         def do_GET(self):
             try:
