@@ -57,7 +57,7 @@ def build_handler(service, static_dir):
                     return self._send(200, service.get_item(int(parts[2])))
                 if len(parts) == 4 and parts[:2] == ["api", "items"] and parts[3] == "audit":
                     item = service.get_item(int(parts[2]))
-                    return self._send(200, {"events": item["audit"]})
+                    return self._send(200, {"events": item["audit"], "chain_valid": service.verify_audit(item["id"])["chain_valid"]})
                 if path == "/":
                     file_path = os.path.join(static_dir, "index.html")
                     with open(file_path, "rb") as handle:
@@ -77,9 +77,11 @@ def build_handler(service, static_dir):
                 payload = self._json_body()
                 parts = [part for part in path.split("/") if part]
                 if parts == ["api", "items"]:
-                    return self._send(201, service.create_item(payload, actor, role, region))
+                    item, created = service.create_item(payload, actor, role, region)
+                    return self._send(201 if created else 200, item)
                 if len(parts) == 4 and parts[:2] == ["api", "items"] and parts[3] == "sources":
-                    return self._send(201, service.add_source(int(parts[2]), payload, actor, role, region))
+                    source, created = service.add_source(int(parts[2]), payload, actor, role, region)
+                    return self._send(201 if created else 200, source)
                 if len(parts) == 4 and parts[:2] == ["api", "items"] and parts[3] == "actions":
                     action = payload.pop("action", "")
                     if not action:

@@ -57,7 +57,7 @@ def normalize_create(payload):
     if odor_reports < 0:
         raise DomainError("invalid_odor_reports", "异味报告数不能为负数")
     reporter = require_text(payload, "reporter")
-    stable_key = "%s|%s|%s" % (pipeline_id, segment_id, reported_at)
+    merge_key = "%s|%s" % (pipeline_id, segment_id)
     return {
         "pipeline_id": pipeline_id,
         "segment_id": segment_id,
@@ -67,9 +67,34 @@ def normalize_create(payload):
         "odor_reports": odor_reports,
         "reporter": reporter,
         "source_comparison": [],
+        "verifications": [],
         "valve_sequence": [],
         "hazards_clear": False,
-        "_stable_key": stable_key,
+        "_merge_key": merge_key,
+    }
+
+
+def create_source_identity(payload, normalized, role):
+    source_type = payload.get("source_type")
+    if source_type is not None and (not isinstance(source_type, str) or not source_type.strip()):
+        raise DomainError("invalid_source_type", "source_type 必须是非空字符串")
+    source_type = (source_type or role).strip()
+    external_id = payload.get("external_id")
+    if external_id is not None and (not isinstance(external_id, str) or not external_id.strip()):
+        raise DomainError("invalid_external_id", "external_id 必须是非空字符串")
+    if not external_id:
+        external_id = "%s|%s" % (normalized["reporter"], normalized["reported_at"])
+    source_payload = {
+        "pressure_drop_kpa": normalized["pressure_drop_kpa"],
+        "sensor_value_ppm": normalized["sensor_value_ppm"],
+        "odor_reports": normalized["odor_reports"],
+        "reporter": normalized["reporter"],
+    }
+    return {
+        "source_type": source_type,
+        "external_id": external_id.strip(),
+        "observed_at": normalized["reported_at"],
+        "payload": source_payload,
     }
 
 

@@ -21,7 +21,7 @@ class WorkflowTest(unittest.TestCase):
         os.unlink(self.tmp.name)
 
     def test_complete_leak_workflow(self):
-        item = self.service.create_item({
+        item, created = self.service.create_item({
             "pipeline_id": "P-1",
             "segment_id": "S-8",
             "reported_at": "2026-09-27T08:00:00+00:00",
@@ -30,14 +30,24 @@ class WorkflowTest(unittest.TestCase):
             "odor_reports": 3,
             "reporter": "dispatch-1",
         }, "dispatch-1", "dispatcher")
+        self.assertTrue(created)
         item = self.service.act(item["id"], "verify", {"field_confirmed": True}, "resp-1", "responder", item["version"])
         self.assertEqual(item["payload"]["assessment"]["level"], "critical")
         item = self.service.act(item["id"], "isolate", {"valve_sequence": ["V-1", "V-2"]}, "sup-1", "supervisor", item["version"])
+        self.assertEqual(item["status"], "isolating")
+        item = self.service.act(item["id"], "valve_receipt", {"valve_id": "V-1", "command_id": "cmd-1", "result": "closed"}, "resp-1", "responder", item["version"])
+        self.assertEqual(item["status"], "isolating")
+        item = self.service.act(item["id"], "valve_receipt", {"valve_id": "V-2", "command_id": "cmd-2", "result": "closed"}, "resp-1", "responder", item["version"])
+        self.assertEqual(item["status"], "isolated")
         item = self.service.act(item["id"], "repair", {"work_order": "WO-1"}, "tech-1", "technician", item["version"])
         item = self.service.act(item["id"], "pressure_test", {"test_passed": True, "pressure_kpa": 150, "minimum_pressure_kpa": 100}, "tech-1", "technician", item["version"])
-        item = self.service.act(item["id"], "restore", {"hazards_clear": True}, "sup-1", "supervisor", item["version"])
+        item = self.service.act(item["id"], "clear_hazard", {"note": "现场检测合格"}, "resp-1", "responder", item["version"])
+        self.assertEqual(item["status"], "tested")
+        item = self.service.act(item["id"], "restore", {}, "sup-1", "supervisor", item["version"])
         self.assertEqual(item["status"], "restored")
-        self.assertGreaterEqual(len(item["audit"]), 6)
+        self.assertTrue(item["payload"]["reconciliation"]["matched"])
+        self.assertGreaterEqual(len(item["audit"]), 9)
+        self.assertTrue(self.service.verify_audit(item["id"])["chain_valid"])
 
 
 if __name__ == "__main__":
